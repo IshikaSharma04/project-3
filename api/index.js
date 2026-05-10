@@ -32,7 +32,7 @@ const sessions = {};
 const HF_API_URL =
   "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction";
 
-async function embedText(text, useToken = true) {
+async function embedText(text, useToken = true, attempt = 1) {
   const headers = { "Content-Type": "application/json" };
   if (useToken && process.env.HF_TOKEN && process.env.HF_TOKEN !== "your_hf_token_here") {
     headers["Authorization"] = `Bearer ${process.env.HF_TOKEN}`;
@@ -46,22 +46,25 @@ async function embedText(text, useToken = true) {
 
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("text/html")) {
-    throw new Error(
-      "HuggingFace model unavailable. Check HF_TOKEN in your .env for reliable access."
-    );
+    if (attempt < 4) {
+      console.warn(`HF returned HTML (attempt ${attempt}/3), retrying in 4s...`);
+      await new Promise((r) => setTimeout(r, 4000));
+      return embedText(text, useToken, attempt + 1);
+    }
+    throw new Error("HuggingFace model temporarily unavailable. Please try again in a moment.");
   }
 
   const data = await res.json();
 
   if (data.error === "Invalid username or password." && useToken) {
     console.warn("HF_TOKEN is invalid. Retrying without token...");
-    return embedText(text, false);
+    return embedText(text, false, attempt);
   }
 
   if (data.estimated_time) {
     const wait = Math.ceil(data.estimated_time * 1000) + 3000;
     await new Promise((r) => setTimeout(r, wait));
-    return embedText(text);
+    return embedText(text, useToken, attempt);
   }
 
   if (!res.ok) throw new Error(`HuggingFace embed error: ${JSON.stringify(data)}`);
