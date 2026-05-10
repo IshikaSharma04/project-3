@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import multer from "multer";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { WebPDFLoader } from "@langchain/community/document_loaders/web/pdf";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -174,7 +174,9 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
     const collectionName = `notebooklm-${sessionId}`;
 
     // 1. Ingestion — parse PDF
-    const loader = new PDFLoader(filePath);
+    const fileBuffer = fs.readFileSync(filePath);
+    const blob = new Blob([fileBuffer], { type: "application/pdf" });
+    const loader = new WebPDFLoader(blob);
     const docs = await loader.load();
 
     // 2. Chunking — RecursiveCharacterTextSplitter
