@@ -25,29 +25,48 @@ const upload = multer({ dest: "uploads/" });
 // In-memory session tracking
 const sessions = {};
 
-// ── Local Embedding (Free, Offline) ──────────────────────────────────────────
-// Uses Xenova/all-MiniLM-L6-v2 → 384-dim vectors
-
-// Initialize the local pipeline once
-let extractor;
-async function getExtractor() {
-  if (!extractor) {
-    const { pipeline } = await import("@xenova/transformers");
-    extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-  }
-  return extractor;
-}
+// ── HuggingFace Embedding (API) ──────────────────────────────────────────────
+// Uses sentence-transformers/all-MiniLM-L6-v2 → 384-dim vectors
+const HF_API_URL =
+  "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction";
 
 async function embedText(text) {
-  const getFeature = await getExtractor();
-  const output = await getFeature(text, { pooling: "mean", normalize: true });
-  return Array.from(output.data);
+  const headers = { "Content-Type": "application/json" };
+  if (process.env.HF_TOKEN) {
+    headers["Authorization"] = `Bearer ${process.env.HF_TOKEN}`;
+  }
+
+  const res = await fetch(HF_API_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ inputs: text }),
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("text/html")) {
+    throw new Error(
+      "HuggingFace model unavailable. Check HF_TOKEN in your .env for reliable access."
+    );
+  }
+
+  const data = await res.json();
+
+  if (data.estimated_time) {
+    const wait = Math.ceil(data.estimated_time * 1000) + 3000;
+    await new Promise((r) => setTimeout(r, wait));
+    return embedText(text);
+  }
+
+  if (!res.ok) throw new Error(`HuggingFace embed error: ${JSON.stringify(data)}`);
+
+  return Array.isArray(data[0]) ? data[0] : data;
 }
 
 async function embedBatch(texts) {
   const results = [];
   for (const text of texts) {
     results.push(await embedText(text));
+    await new Promise((r) => setTimeout(r, 120)); // small delay to avoid rate limit
   }
   return results;
 }
