@@ -1,7 +1,9 @@
 import "dotenv/config";
 import express from "express";
 import multer from "multer";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -174,14 +176,16 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
     const collectionName = `notebooklm-${sessionId}`;
 
     // 1. Ingestion — parse PDF
-    const loader = new PDFLoader(filePath);
-    const docs = await loader.load();
+    const fileBuffer = fs.readFileSync(filePath);
+    const pdfData = await pdfParse(fileBuffer);
 
     // 2. Chunking — RecursiveCharacterTextSplitter
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 200,
     });
+    // Create Langchain documents manually from the extracted text
+    const docs = await splitter.createDocuments([pdfData.text]);
     const chunks = await splitter.splitDocuments(docs);
 
     const chunkTexts = chunks.map((c, i) => ({
