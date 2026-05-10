@@ -1,208 +1,257 @@
 let currentSessionId = null;
 
-// DOM Elements
-const uploadBox = document.getElementById('uploadBox');
-const fileInput = document.getElementById('fileInput');
-const fileInfo = document.getElementById('fileInfo');
-const fileName = document.getElementById('fileName');
-const chunkInfo = document.getElementById('chunkInfo');
-const uploadBtn = document.getElementById('uploadBtn');
+// ── DOM Refs ─────────────────────────────────────────────────────────────────
+const uploadBox    = document.getElementById('uploadBox');
+const fileInput    = document.getElementById('fileInput');
+const browseBtn    = document.getElementById('browseBtn');
+const dropIdle     = document.getElementById('dropIdle');
+const dropFile     = document.getElementById('dropFile');
+const fileNameEl   = document.getElementById('fileName');
+const fileStatusEl = document.getElementById('fileStatus');
+const uploadBtn    = document.getElementById('uploadBtn');
 const uploadLoader = document.getElementById('uploadLoader');
-const chatContainer = document.getElementById('chatContainer');
-const emptyState = document.getElementById('emptyState');
-const chatForm = document.getElementById('chatForm');
-const chatInput = document.getElementById('chatInput');
-const sendBtn = document.getElementById('sendBtn');
+const progressBar  = document.getElementById('progressBar');
+const topbarTitle  = document.getElementById('topbarTitle');
+const chatContainer= document.getElementById('chatContainer');
+const emptyState   = document.getElementById('emptyState');
+const chatForm     = document.getElementById('chatForm');
+const chatInput    = document.getElementById('chatInput');
+const sendBtn      = document.getElementById('sendBtn');
 
 let selectedFile = null;
+let progressInterval = null;
 
-// Upload Box Interactions
+// ── Auto-resize textarea ─────────────────────────────────────────────────────
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + 'px';
+});
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
 uploadBox.addEventListener('click', () => fileInput.click());
+browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
 
 uploadBox.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadBox.classList.add('dragover');
+  e.preventDefault();
+  uploadBox.classList.add('dragover');
 });
 
-uploadBox.addEventListener('dragleave', () => {
-    uploadBox.classList.remove('dragover');
-});
+uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
 
 uploadBox.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadBox.classList.remove('dragover');
-    
-    if (e.dataTransfer.files.length) {
-        handleFileSelect(e.dataTransfer.files[0]);
-    }
+  e.preventDefault();
+  uploadBox.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files[0]);
 });
 
 fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length) {
-        handleFileSelect(e.target.files[0]);
-    }
+  if (e.target.files.length) handleFileSelect(e.target.files[0]);
 });
 
 function handleFileSelect(file) {
-    if (file.type !== 'application/pdf') {
-        alert('Please upload a PDF file.');
-        return;
-    }
-    selectedFile = file;
-    fileName.textContent = file.name;
-    chunkInfo.textContent = 'Ready to index';
-    
-    uploadBox.classList.add('hidden');
-    fileInfo.classList.remove('hidden');
-    uploadBtn.classList.remove('hidden');
+  if (file.type !== 'application/pdf') {
+    showToast('Please upload a PDF file.');
+    return;
+  }
+  selectedFile = file;
+  fileNameEl.textContent = file.name;
+  fileStatusEl.textContent = 'Click "Index Document" to process';
+
+  dropIdle.classList.add('hidden');
+  dropFile.classList.remove('hidden');
+  uploadBtn.classList.remove('hidden');
 }
 
-// Upload & Index API Call
+// ── Upload & Index ────────────────────────────────────────────────────────────
 uploadBtn.addEventListener('click', async () => {
-    if (!selectedFile) return;
+  if (!selectedFile) return;
 
-    uploadBtn.classList.add('hidden');
-    uploadLoader.classList.remove('hidden');
+  uploadBtn.classList.add('hidden');
+  uploadLoader.classList.remove('hidden');
+  animateProgress();
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+  const formData = new FormData();
+  formData.append('file', selectedFile);
 
-    try {
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
+  try {
+    const res  = await fetch('/api/upload', { method: 'POST', body: formData });
+    const data = await res.json();
 
-        const data = await response.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-        if (response.ok) {
-            currentSessionId = data.sessionId;
-            chunkInfo.textContent = \`\${data.totalChunks} chunks indexed\`;
-            
-            // Enable Chat
-            chatInput.disabled = false;
-            sendBtn.disabled = false;
-            chatInput.focus();
-            
-            appendMessage('bot', \`Successfully indexed **\${selectedFile.name}**! You can now ask questions about this document.\`);
-        } else {
-            throw new Error(data.error || 'Upload failed');
-        }
-    } catch (error) {
-        alert('Error: ' + error.message);
-        uploadBtn.classList.remove('hidden');
-        chunkInfo.textContent = 'Failed. Try again.';
-    } finally {
-        uploadLoader.classList.add('hidden');
-    }
+    currentSessionId = data.sessionId;
+    fileStatusEl.textContent = `${data.totalChunks} chunks indexed ✓`;
+    topbarTitle.textContent  = selectedFile.name;
+    setProgress(100);
+
+    chatInput.disabled = false;
+    sendBtn.disabled   = false;
+    chatInput.placeholder = 'Ask anything about your document…';
+    chatInput.focus();
+
+    appendMessage('bot',
+      `📄 **${selectedFile.name}** has been processed into **${data.totalChunks} chunks** and indexed into Qdrant.\n\nAsk me anything about this document!`,
+      []
+    );
+
+  } catch (err) {
+    showToast('Error: ' + err.message);
+    uploadBtn.classList.remove('hidden');
+    fileStatusEl.textContent = 'Failed — try again';
+  } finally {
+    clearInterval(progressInterval);
+    setTimeout(() => uploadLoader.classList.add('hidden'), 600);
+  }
 });
 
-// Chat API Call
+// ── Chat ──────────────────────────────────────────────────────────────────────
 chatForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const query = chatInput.value.trim();
-    if (!query || !currentSessionId) return;
+  e.preventDefault();
+  const query = chatInput.value.trim();
+  if (!query || !currentSessionId) return;
 
-    // Clear input
-    chatInput.value = '';
-    
-    // Add user message
-    appendMessage('user', query);
-    
-    // Add thinking animation
-    const thinkingId = addThinking();
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+  appendMessage('user', query, null);
 
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                query,
-                sessionId: currentSessionId
-            })
-        });
+  const thinkId = addThinking();
 
-        const data = await response.json();
-        removeThinking(thinkingId);
+  try {
+    const res  = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, sessionId: currentSessionId }),
+    });
+    const data = await res.json();
+    removeThinking(thinkId);
 
-        if (response.ok) {
-            appendMessage('bot', data.answer, data.sources);
-        } else {
-            throw new Error(data.error || 'Failed to get answer');
-        }
-    } catch (error) {
-        removeThinking(thinkingId);
-        appendMessage('bot', \`**Error:** \${error.message}\`);
-    }
+    if (!res.ok) throw new Error(data.error || 'Chat failed');
+    appendMessage('bot', data.answer, data.sources);
+
+  } catch (err) {
+    removeThinking(thinkId);
+    appendMessage('bot', `**Error:** ${err.message}`, []);
+  }
 });
 
-// Message UI Functions
-function appendMessage(role, content, sources = null) {
-    emptyState.classList.add('hidden');
+// ── Keyboard submit ───────────────────────────────────────────────────────────
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    chatForm.dispatchEvent(new Event('submit'));
+  }
+});
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = \`message \${role}\`;
+// ── Message Rendering ─────────────────────────────────────────────────────────
+function appendMessage(role, content, sources) {
+  emptyState.classList.add('hidden');
 
-    const icon = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+  const row = document.createElement('div');
+  row.className = `msg-row ${role}`;
 
-    let sourcesHtml = '';
-    if (sources && sources.length > 0) {
-        const sourcesId = 'sources-' + Math.random().toString(36).substr(2, 9);
-        
-        let chunksHtml = sources.map((s, i) => 
-            \`<div style="margin-bottom: 8px;">
-                <strong>Chunk \${s.metadata.chunkIndex}</strong>: 
-                \${s.text.substring(0, 150)}...
-            </div>\`
-        ).join('');
+  const initials = role === 'user' ? 'U' : '✦';
+  const avatarHtml = `<div class="msg-avatar ${role}">${initials}</div>`;
 
-        sourcesHtml = \`
-            <div class="sources">
-                <button class="source-toggle" onclick="document.getElementById('\${sourcesId}').style.display = document.getElementById('\${sourcesId}').style.display === 'block' ? 'none' : 'block'">
-                    <i class="fa-solid fa-layer-group"></i> View \${sources.length} Retrieved Sources
-                </button>
-                <div id="\${sourcesId}" class="source-content">
-                    \${chunksHtml}
-                </div>
-            </div>
-        \`;
-    }
+  // Render markdown safely
+  const htmlContent = marked.parse(content || '');
 
-    messageDiv.innerHTML = \`
-        <div class="avatar">\${icon}</div>
-        <div class="bubble">
-            \${marked.parse(content)}
-            \${sourcesHtml}
+  // Build sources block
+  let sourcesHtml = '';
+  if (role === 'bot' && sources && sources.length > 0) {
+    const id = 'src-' + Math.random().toString(36).slice(2, 9);
+    const cards = sources.map((s, i) => `
+      <div class="source-card">
+        <div class="source-card-header">
+          <span class="source-chunk-label">Chunk ${(s.metadata?.chunkIndex ?? i) + 1}</span>
         </div>
-    \`;
+        <p class="source-preview">${escapeHtml(s.text.slice(0, 200))}…</p>
+      </div>
+    `).join('');
 
-    chatContainer.appendChild(messageDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    sourcesHtml = `
+      <div class="sources-block">
+        <button class="sources-btn" onclick="toggleSources('${id}', this)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          ${sources.length} source chunk${sources.length > 1 ? 's' : ''}
+        </button>
+        <div class="sources-list hidden" id="${id}">${cards}</div>
+      </div>
+    `;
+  }
+
+  row.innerHTML = `
+    ${avatarHtml}
+    <div class="msg-content">
+      <div class="msg-bubble">${htmlContent}</div>
+      ${sourcesHtml}
+    </div>
+  `;
+
+  chatContainer.appendChild(row);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
+// ── Thinking ──────────────────────────────────────────────────────────────────
 function addThinking() {
-    emptyState.classList.add('hidden');
-    const id = 'think-' + Math.random().toString(36).substr(2, 9);
-    
-    const div = document.createElement('div');
-    div.className = 'message bot';
-    div.id = id;
-    div.innerHTML = \`
-        <div class="avatar"><i class="fa-solid fa-robot"></i></div>
-        <div class="bubble thinking">
-            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-        </div>
-    \`;
-    
-    chatContainer.appendChild(div);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    return id;
+  const id = 'think-' + Math.random().toString(36).slice(2, 9);
+  const div = document.createElement('div');
+  div.className = 'thinking-row';
+  div.id = id;
+  div.innerHTML = `
+    <div class="msg-avatar bot">✦</div>
+    <div class="thinking-dots">
+      <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+    </div>
+  `;
+  chatContainer.appendChild(div);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+  return id;
 }
 
 function removeThinking(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
+  document.getElementById(id)?.remove();
+}
+
+// ── Source Toggle ─────────────────────────────────────────────────────────────
+function toggleSources(id, btn) {
+  const list = document.getElementById(id);
+  const isHidden = list.classList.toggle('hidden');
+  btn.style.color = isHidden ? '' : 'var(--accent-a)';
+}
+
+// ── Progress Bar ─────────────────────────────────────────────────────────────
+function animateProgress() {
+  let pct = 5;
+  setProgress(pct);
+  progressInterval = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 8, 88);
+    setProgress(pct);
+  }, 500);
+}
+
+function setProgress(pct) {
+  progressBar.style.width = pct + '%';
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = `
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#1e293b; border:1px solid rgba(255,255,255,0.1);
+    color:#f1f5f9; padding:12px 24px; border-radius:10px;
+    font-family:Outfit,sans-serif; font-size:.88rem; z-index:9999;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5);
+    animation:fadeUp .3s ease;
+  `;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }

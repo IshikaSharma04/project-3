@@ -3,78 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NotebookLM Clone - RAG App</title>
+    <title>NotebookLM Clone — RAG Document Chat</title>
+    <meta name="description" content="Chat with your documents using AI. Upload a PDF and get grounded answers powered by RAG.">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <header>
-            <div class="logo">
-                <i class="fa-solid fa-book-open"></i>
-                <h1>NotebookLM Clone</h1>
+    <!-- Animated Background -->
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="app-shell">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-name">NotebookLM</h1>
+                    <p class="brand-sub">RAG Document Chat</p>
+                </div>
             </div>
-            <div class="badge">RAG Powered</div>
-        </header>
 
-        <main>
-            <aside class="sidebar">
-                <div class="upload-section">
-                    <h3>Your Document</h3>
-                    <div class="upload-box" id="uploadBox">
-                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <p>Drag & Drop your PDF</p>
-                        <p class="sub-text">or click to browse</p>
-                        <input type="file" id="fileInput" accept=".pdf" hidden>
+            <div class="divider"></div>
+
+            <!-- Upload Area -->
+            <div class="section-label">Source Document</div>
+
+            <div class="drop-zone" id="uploadBox">
+                <input type="file" id="fileInput" accept=".pdf" hidden>
+                <div class="drop-zone-idle" id="dropIdle">
+                    <div class="upload-ring">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
                     </div>
-                    <div id="fileInfo" class="hidden file-info">
-                        <i class="fa-solid fa-file-pdf"></i>
-                        <div class="file-details">
-                            <p id="fileName" class="file-name"></p>
-                            <p id="chunkInfo" class="chunk-info"></p>
-                        </div>
-                    </div>
-                    <button id="uploadBtn" class="upload-btn hidden">Index Document</button>
-                    <div class="loader-container hidden" id="uploadLoader">
-                        <div class="spinner"></div>
-                        <p>Processing & Embedding...</p>
+                    <p class="drop-label">Drop PDF here</p>
+                    <p class="drop-sub">or <span class="drop-link" id="browseBtn">browse file</span></p>
+                </div>
+                <div class="drop-zone-file hidden" id="dropFile">
+                    <div class="pdf-icon">PDF</div>
+                    <div class="file-meta">
+                        <p class="file-name-text" id="fileName">—</p>
+                        <p class="file-status" id="fileStatus">Ready to index</p>
                     </div>
                 </div>
+            </div>
 
-                <div class="architecture-info">
-                    <h3>Pipeline Stack</h3>
-                    <div class="tech-item"><i class="fa-brands fa-node-js"></i> Express.js</div>
-                    <div class="tech-item"><i class="fa-solid fa-layer-group"></i> LangChain</div>
-                    <div class="tech-item"><i class="fa-solid fa-brain"></i> OpenAI (LLM & Embeddings)</div>
-                    <div class="tech-item"><i class="fa-solid fa-database"></i> Qdrant Vector DB</div>
+            <button class="btn-index hidden" id="uploadBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Index Document
+            </button>
+
+            <div class="indexing-state hidden" id="uploadLoader">
+                <div class="progress-track">
+                    <div class="progress-glow" id="progressBar"></div>
                 </div>
-            </aside>
+                <p class="indexing-label">Chunking · Embedding · Storing…</p>
+            </div>
 
-            <section class="chat-section">
-                <div class="chat-container" id="chatContainer">
-                    <div class="empty-state" id="emptyState">
-                        <i class="fa-solid fa-robot"></i>
-                        <h2>Chat with your Document</h2>
-                        <p>Upload a PDF document to start asking questions grounded in its content.</p>
+            <!-- Pipeline Info -->
+            <div class="divider"></div>
+            <div class="section-label">Pipeline</div>
+            <div class="pipeline">
+                <div class="pipe-step">
+                    <div class="pipe-dot"></div>
+                    <div class="pipe-info">
+                        <span class="pipe-name">Chunking</span>
+                        <span class="pipe-val">RecursiveChar · 1000ch</span>
                     </div>
-                    <!-- Messages will be injected here -->
                 </div>
+                <div class="pipe-line"></div>
+                <div class="pipe-step">
+                    <div class="pipe-dot"></div>
+                    <div class="pipe-info">
+                        <span class="pipe-name">Embedding</span>
+                        <span class="pipe-val">text-embedding-3-small</span>
+                    </div>
+                </div>
+                <div class="pipe-line"></div>
+                <div class="pipe-step">
+                    <div class="pipe-dot"></div>
+                    <div class="pipe-info">
+                        <span class="pipe-name">Vector DB</span>
+                        <span class="pipe-val">Qdrant · Cosine</span>
+                    </div>
+                </div>
+                <div class="pipe-line"></div>
+                <div class="pipe-step">
+                    <div class="pipe-dot"></div>
+                    <div class="pipe-info">
+                        <span class="pipe-name">Generation</span>
+                        <span class="pipe-val">GPT-4o-mini</span>
+                    </div>
+                </div>
+            </div>
 
-                <div class="input-area">
-                    <form id="chatForm">
-                        <input type="text" id="chatInput" placeholder="Ask a question about the document..." disabled>
-                        <button type="submit" id="sendBtn" disabled>
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
-                    </form>
-                    <p class="disclaimer">Answers are generated based only on the uploaded document.</p>
+            <div class="divider"></div>
+            <p class="footer-note">Answers grounded in document only — no hallucinations.</p>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main">
+
+            <!-- Top Bar -->
+            <div class="topbar">
+                <div class="topbar-title" id="topbarTitle">No document loaded</div>
+                <div class="tag-rag">RAG Powered</div>
+            </div>
+
+            <!-- Messages -->
+            <div class="messages" id="chatContainer">
+                <div class="welcome" id="emptyState">
+                    <div class="welcome-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                        </svg>
+                    </div>
+                    <h2 class="welcome-title">Ask anything about your document</h2>
+                    <p class="welcome-sub">Upload a PDF from the sidebar, then ask questions. Every answer cites context directly from the document.</p>
+                    <div class="suggestion-row">
+                        <button class="suggestion-chip" onclick="fillSuggestion(this)">Summarize the document</button>
+                        <button class="suggestion-chip" onclick="fillSuggestion(this)">What are the key points?</button>
+                        <button class="suggestion-chip" onclick="fillSuggestion(this)">List the main conclusions</button>
+                    </div>
                 </div>
-            </section>
+                <!-- Chat messages injected here -->
+            </div>
+
+            <!-- Input -->
+            <div class="input-dock">
+                <form id="chatForm" class="input-form">
+                    <textarea
+                        id="chatInput"
+                        class="chat-textarea"
+                        placeholder="Upload a PDF first to start chatting…"
+                        disabled
+                        rows="1"
+                    ></textarea>
+                    <button type="submit" id="sendBtn" class="send-btn" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                    </button>
+                </form>
+                <p class="input-caption">Answers are grounded in the uploaded document — not the model's training data.</p>
+            </div>
+
         </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>
+    <script>
+        function fillSuggestion(btn) {
+            const input = document.getElementById('chatInput');
+            if (!input.disabled) {
+                input.value = btn.textContent;
+                input.focus();
+            }
+        }
+    </script>
 </body>
 </html>
