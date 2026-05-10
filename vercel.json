@@ -1,21 +1,13 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "node_modules/pdf-parse/**",
-          "public/**"
-        ]
-      }
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "node_modules/pdf-parse/**"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "index.js"
+      "source": "/(.*)",
+      "destination": "/api/index.js"
     }
   ]
 }
