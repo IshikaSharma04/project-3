@@ -20,7 +20,7 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "/tmp" });
 
 // In-memory session tracking
 const sessions = {};
@@ -274,3 +274,5 @@ app.post("/api/chat", async (req, res) => {
 app.listen(port, () => {
   console.log(`NotebookLM RAG app listening on http://localhost:${port}`);
 });
+
+export default app;
