@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotebookLM Clone - RAG App</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-book-open"></i>
+                <h1>NotebookLM Clone</h1>
+            </div>
+            <div class="badge">RAG Powered</div>
+        </header>
+
+        <main>
+            <aside class="sidebar">
+                <div class="upload-section">
+                    <h3>Your Document</h3>
+                    <div class="upload-box" id="uploadBox">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <p>Drag & Drop your PDF</p>
+                        <p class="sub-text">or click to browse</p>
+                        <input type="file" id="fileInput" accept=".pdf" hidden>
+                    </div>
+                    <div id="fileInfo" class="hidden file-info">
+                        <i class="fa-solid fa-file-pdf"></i>
+                        <div class="file-details">
+                            <p id="fileName" class="file-name"></p>
+                            <p id="chunkInfo" class="chunk-info"></p>
+                        </div>
+                    </div>
+                    <button id="uploadBtn" class="upload-btn hidden">Index Document</button>
+                    <div class="loader-container hidden" id="uploadLoader">
+                        <div class="spinner"></div>
+                        <p>Processing & Embedding...</p>
+                    </div>
+                </div>
+
+                <div class="architecture-info">
+                    <h3>Pipeline Stack</h3>
+                    <div class="tech-item"><i class="fa-brands fa-node-js"></i> Express.js</div>
+                    <div class="tech-item"><i class="fa-solid fa-layer-group"></i> LangChain</div>
+                    <div class="tech-item"><i class="fa-solid fa-brain"></i> OpenAI (LLM & Embeddings)</div>
+                    <div class="tech-item"><i class="fa-solid fa-database"></i> Qdrant Vector DB</div>
+                </div>
+            </aside>
+
+            <section class="chat-section">
+                <div class="chat-container" id="chatContainer">
+                    <div class="empty-state" id="emptyState">
+                        <i class="fa-solid fa-robot"></i>
+                        <h2>Chat with your Document</h2>
+                        <p>Upload a PDF document to start asking questions grounded in its content.</p>
+                    </div>
+                    <!-- Messages will be injected here -->
+                </div>
+
+                <div class="input-area">
+                    <form id="chatForm">
+                        <input type="text" id="chatInput" placeholder="Ask a question about the document..." disabled>
+                        <button type="submit" id="sendBtn" disabled>
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                    <p class="disclaimer">Answers are generated based only on the uploaded document.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
