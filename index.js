@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import multer from "multer";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import "pdf-parse"; // Force Vercel bundler to include pdf-parse
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -272,8 +271,10 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`NotebookLM RAG app listening on http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== "production") {
+  app.listen(port, () => {
+    console.log(`NotebookLM RAG app listening on http://localhost:${port}`);
+  });
+}
 
 export default app;
