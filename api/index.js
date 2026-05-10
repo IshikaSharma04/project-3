@@ -32,9 +32,9 @@ const sessions = {};
 const HF_API_URL =
   "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction";
 
-async function embedText(text) {
+async function embedText(text, useToken = true) {
   const headers = { "Content-Type": "application/json" };
-  if (process.env.HF_TOKEN) {
+  if (useToken && process.env.HF_TOKEN && process.env.HF_TOKEN !== "your_hf_token_here") {
     headers["Authorization"] = `Bearer ${process.env.HF_TOKEN}`;
   }
 
@@ -52,6 +52,11 @@ async function embedText(text) {
   }
 
   const data = await res.json();
+
+  if (data.error === "Invalid username or password." && useToken) {
+    console.warn("HF_TOKEN is invalid. Retrying without token...");
+    return embedText(text, false);
+  }
 
   if (data.estimated_time) {
     const wait = Math.ceil(data.estimated_time * 1000) + 3000;
